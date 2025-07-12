@@ -1,0 +1,116 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+function createESP(target, isItem)
+	local espBox = Drawing.new("Square")
+	espBox.Color = isItem and Color3.new(1, 1, 0) or Color3.new(1, 0, 0)
+	espBox.Thickness = 2
+	espBox.Transparency = 1
+	espBox.Filled = false
+
+	local tracer = Drawing.new("Line")
+	tracer.Color = espBox.Color
+	tracer.Thickness = 1
+	tracer.Transparency = 1
+
+	local nameText = Drawing.new("Text")
+	nameText.Size = 14
+	nameText.Center = true
+	nameText.Outline = true
+	nameText.Transparency = 1
+
+	local healthText = Drawing.new("Text")
+	healthText.Size = 14
+	healthText.Center = true
+	healthText.Outline = true
+	healthText.Transparency = 1
+
+	local distanceText = Drawing.new("Text")
+	distanceText.Size = 14
+	distanceText.Center = true
+	distanceText.Outline = true
+	distanceText.Transparency = 1
+
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		if not target or not target:IsDescendantOf(workspace) then
+			espBox:Remove()
+			tracer:Remove()
+			nameText:Remove()
+			healthText:Remove()
+			distanceText:Remove()
+			connection:Disconnect()
+			return
+		end
+
+		local pos, onScreen = Camera:WorldToViewportPoint(target.Position)
+		if onScreen then
+			local size = (Camera:WorldToViewportPoint(target.Position + Vector3.new(2, 3, 0)) - Camera:WorldToViewportPoint(target.Position - Vector3.new(2, 3, 0))).Magnitude
+
+			espBox.Size = Vector2.new(size * 1.5, size * 2)
+			espBox.Position = Vector2.new(pos.X - espBox.Size.X / 2, pos.Y - espBox.Size.Y / 2)
+			espBox.Visible = true
+
+			tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+			tracer.To = Vector2.new(pos.X, pos.Y)
+			tracer.Visible = true
+
+			nameText.Position = Vector2.new(pos.X, pos.Y - espBox.Size.Y / 2 - 14)
+			nameText.Text = isItem and "[Item]" or (target.Parent and target.Parent:FindFirstChild("NameTag") and target.Parent.NameTag.Value or target.Parent.Name)
+			nameText.Visible = true
+
+			distanceText.Position = Vector2.new(pos.X, pos.Y + espBox.Size.Y / 2 + 2)
+			distanceText.Text = string.format("%.0f studs", (Camera.CFrame.Position - target.Position).Magnitude)
+			distanceText.Visible = true
+
+			if not isItem and target.Parent:FindFirstChild("Humanoid") then
+				local health = target.Parent.Humanoid.Health
+				local max = target.Parent.Humanoid.MaxHealth
+				healthText.Position = Vector2.new(pos.X, pos.Y + espBox.Size.Y / 2 + 18)
+				healthText.Text = string.format("HP: %.0f/%.0f", health, max)
+				healthText.Visible = true
+			else
+				healthText.Visible = false
+			end
+		else
+			espBox.Visible = false
+			tracer.Visible = false
+			nameText.Visible = false
+			healthText.Visible = false
+			distanceText.Visible = false
+		end
+	end)
+end
+
+-- Function to setup ESP for a character
+local function setupCharacterESP(character)
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		createESP(hrp)
+	end
+end
+
+-- Set ESP for all current players
+for _, player in ipairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer then
+		if player.Character then
+			setupCharacterESP(player.Character)
+		end
+		player.CharacterAdded:Connect(setupCharacterESP)
+	end
+end
+
+-- Also create ESP for the local player (your own character)
+if LocalPlayer.Character then
+	setupCharacterESP(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(setupCharacterESP)
+
+-- ESP for items in workspace
+for _, item in ipairs(workspace:GetChildren()) do
+	if item:IsA("Tool") or item.Name == "Item" then
+		createESP(item:FindFirstChild("Handle") or item.PrimaryPart or item, true)
+	end
+end
